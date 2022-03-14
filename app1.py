@@ -16,17 +16,28 @@ import requests
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-
-
 def get_tolerance(str):
     if str == "low":
         tol_angle = 10
     else:
         tol_angle = 20
     return tol_angle
-    
 
 
+class Var:
+    def _init_():
+        counter=0
+        stage = None
+        t1 = t2 = time.time()
+        curr_timer = time.time()
+        start_time = time.time()
+        times = [0] * 4
+        threshtime = 2
+        feedback = None
+        rep_time = None
+        tol_angle = get_tolerance('low')
+        error = 0
+        params = {"counter": counter, "timer": 0, "error": error}
 
 
 
@@ -64,20 +75,8 @@ socketio = SocketIO(app,cors_allowed_origins='*' )
 @app.route('/', methods=['POST', 'GET'])
 
 def index():
-    global counter,stage,t1,t2,curr_timer,start_time,times,threshtime,feedback,rep_time,tol_angle,error,params
-    counter=0
-    stage = None
-    t1 = t2 = time.time()
-    curr_timer = time.time()
-    start_time = time.time()
-    times = [0] * 4
-    threshtime = 2
-    feedback = None
-    rep_time = None
-
-    tol_angle = get_tolerance('low')
-    error = 0
-    params = {"counter": counter, "timer": 0, "error": error}
+    global vars
+    vars = Var()
     return render_template('index.html')
 
 
@@ -99,7 +98,6 @@ def catch_frame(data):
 
 @socketio.on('image')
 def image(data_image):
-    global counter,stage,t1,t2,curr_timer,start_time,times,threshtime,feedback,rep_time,tol_angle,error,params
     image = (readb64(data_image))
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
          # Recolor image to RGB
@@ -115,7 +113,7 @@ def image(data_image):
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
         # Storing curr time
-        curr_timer = time.time()
+        vars.curr_timer = time.time()
 
         # Extract landmarks
         try:
@@ -140,20 +138,20 @@ def image(data_image):
                         )
 
             # Curl counter logic
-            if angle > 160 - tol_angle and (stage is None or stage == 'up'):
-                if stage == 'up':
-                    t2 = time.time() # curr rep time
-                    times[(counter-1)%4] = abs(t2-t1) # storing to track average time per rep
-                    rep_time = abs(t2-t1) # storing it to print later
+            if angle > 160 - vars.tol_angle and (vars.stage is None or vars.stage == 'up'):
+                if vars.stage == 'up':
+                    vars.t2 = time.time() # curr rep time
+                    vars.times[(vars.counter-1)%4] = abs(vars.t2-vars.t1) # storing to track average time per rep
+                    vars.rep_time = abs(vars.t2-vars.t1) # storing it to print later
 
-                t1 = time.time() # previous rep time
+                vars.t1 = time.time() # previous rep time
 
-            if angle > 160 - tol_angle:
-                stage = "down"
+            if angle > 160 - vars.tol_angle:
+                vars.stage = "down"
 
-            if angle < 35 + tol_angle and stage == 'down':
-                stage = "up"
-                counter += 1
+            if angle < 35 + vars.tol_angle and vars.stage == 'down':
+                vars.stage = "up"
+                vars.counter += 1
                 # print(counter)
 
         except:
@@ -166,14 +164,14 @@ def image(data_image):
         # Rep data
         cv2.putText(image, 'REPS', (15, 12),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-        cv2.putText(image, str(counter),
+        cv2.putText(image, str(vars.counter),
                     (10, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2, cv2.LINE_AA)
 
         # Stage data
         cv2.putText(image, 'STAGE', (140, 12),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-        cv2.putText(image, stage,
+        cv2.putText(image, vars.stage,
                     (120, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2, cv2.LINE_AA)
 
@@ -181,7 +179,7 @@ def image(data_image):
         cv2.putText(image, 'REP TIME', (320, 12),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
-        cv2.putText(image, str(rep_time)[0:4],
+        cv2.putText(image, str(vars.rep_time)[0:4],
                     (300, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2, cv2.LINE_AA)
 
@@ -189,26 +187,26 @@ def image(data_image):
         cv2.putText(image, 'FEEDBACK', (500, 12),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
-        if counter % 4 == 0 and counter != 0:
-            if (np.mean(times) - threshtime) > threshtime/4:
-                feedback = 'Do Fast'
-                error += 1
-            elif (threshtime - np.mean(times)) > threshtime/4:
-                feedback = 'Do slow'
-                error += 1
+        if vars.counter % 4 == 0 and vars.counter != 0:
+            if (np.mean(vars.times) - vars.threshtime) > vars.threshtime/4:
+                vars.feedback = 'Do Fast'
+                vars.error += 1
+            elif (vars.threshtime - np.mean(vars.times)) > vars.threshtime/4:
+                vars.feedback = 'Do slow'
+                vars.error += 1
             else:
-                feedback = 'Doing good'
+                vars.feedback = 'Doing good'
 
-        elif abs(curr_timer-t1) > 3.5: # if curr time - prev rep > 3 we say 
-            if stage == 'up':
-                feedback = 'Lower your arms'
+        elif abs(vars.curr_timer-vars.t1) > 3.5: # if curr time - prev rep > 3 we say 
+            if vars.stage == 'up':
+                vars.feedback = 'Lower your arms'
             else:
-                feedback = 'Raise your arms'
+                vars.feedback = 'Raise your arms'
 
         else:
-            feedback = None
+            vars.feedback = None
 
-        cv2.putText(image, feedback,
+        cv2.putText(image, vars.feedback,
                     (450, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
 
@@ -220,11 +218,11 @@ def image(data_image):
                                         color=(245, 66, 230), thickness=2, circle_radius=1)
                                     )
         
-        if counter >= 1:
-            params["counter"] = counter
+        if vars.counter >= 1:
+            vars.params["counter"] = vars.counter
             tim = time.time()
-            params["timer"] = np.round(tim - start_time, 2)
-            params["error"] = error
+            vars.params["timer"] = np.round(tim - vars.start_time, 2)
+            vars.params["error"] = vars.error
 
         imgencode = cv2.imencode('.jpeg', image,[cv2.IMWRITE_JPEG_QUALITY,40])[1]
 
@@ -239,20 +237,6 @@ def image(data_image):
 
 
 if __name__ == '__main__':
-    # Global variables
-    global counter,stage,t1,t2,curr_timer,start_time,times,threshtime,feedback,rep_time,tol_angle,error,params
-    counter=0
-    stage = None
-    t1 = t2 = time.time()
-    curr_timer = time.time()
-    start_time = time.time()
-    times = [0] * 4
-    threshtime = 2
-    feedback = None
-    rep_time = None
-
-    tol_angle = get_tolerance('low')
-    error = 0
-    params = {"counter": counter, "timer": 0, "error": error}
     socketio.run(app,port=9990 ,debug=True)
-   
+
+    
