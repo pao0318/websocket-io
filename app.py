@@ -64,6 +64,20 @@ socketio = SocketIO(app,cors_allowed_origins='*' )
 @app.route('/', methods=['POST', 'GET'])
 
 def index():
+    global counter,stage,t1,t2,curr_timer,start_time,times,threshtime,feedback,rep_time,tol_angle,error,params
+    counter=0
+    stage = None
+    t1 = t2 = time.time()
+    curr_timer = time.time()
+    start_time = time.time()
+    times = [0] * 4
+    threshtime = 2
+    feedback = None
+    rep_time = None
+
+    tol_angle = get_tolerance('low')
+    error = 0
+    params = {"counter": counter, "timer": 0, "error": error}
     return render_template('index.html')
 
 
