@@ -56,12 +56,12 @@ def calculate_angle_lateral(a, b, c):
 
 Payload.max_decode_packets = 2048
 
-app = Flask(__name__)
-socketio = SocketIO(app,cors_allowed_origins='*' )
+application = Flask(__name__)
+socketio = SocketIO(application,cors_allowed_origins='*' )
 
 
 
-@app.route('/', methods=['POST', 'GET'])
+@application.route('/', methods=['POST', 'GET'])
 
 def index():
     global counter,stage,t1,t2,curr_timer,start_time,times,threshtime,feedback,rep_time,tol_angle,error,params
@@ -100,6 +100,8 @@ def catch_frame(data):
 @socketio.on('image')
 def image(data_image):
     global counter,stage,t1,t2,curr_timer,start_time,times,threshtime,feedback,rep_time,tol_angle,error,params
+    
+
     image = (readb64(data_image))
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
          # Recolor image to RGB
@@ -254,5 +256,6 @@ if __name__ == '__main__':
     tol_angle = get_tolerance('low')
     error = 0
     params = {"counter": counter, "timer": 0, "error": error}
-    socketio.run(app,port=9990 ,debug=True)
+    socketio.run(application,port=9990 ,debug=True)
    
+
